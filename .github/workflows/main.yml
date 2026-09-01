@@ -34,7 +34,9 @@ jobs:
 
       # ── 3. Install XcodeGen ──────────────────────────────────────
       - name: 🍺 Install XcodeGen
-        run: brew install xcodegen
+        run: |
+          export HOMEBREW_NO_REQUIRE_TAP_TRUST=1
+          brew install xcodegen
 
       # ── 4. Generate .xcodeproj ───────────────────────────────────
       - name: ⚙️ Generate Xcode project
