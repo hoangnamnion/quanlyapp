@@ -1,3 +1,5 @@
+import SwiftUI
+
 // MARK: - App Theme (Light)
 
 struct AppTheme {
