@@ -1,100 +1,67 @@
-name: 🍎 Build iOS IPA
+name: 🍎 Build iOS IPA (Capacitor Native App)
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
   workflow_dispatch:
-    inputs:
-      configuration:
-        description: 'Build configuration'
-        required: false
-        default: 'Release'
-        type: choice
-        options:
-          - Release
-          - Debug
 
 jobs:
   build-ipa:
-    name: Build CustomerManager IPA
+    name: Build Native iOS IPA
     runs-on: macos-14
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────
-      - name: 📥 Checkout
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Select Latest Xcode (Xcode 16+) ──────────────────────
-      - name: 🔧 Select Latest Xcode
-        run: |
-          LATEST_XCODE=$(find /Applications -maxdepth 1 -name "Xcode_*.app" | sort -V | tail -n 1)
-          echo "Using Xcode: $LATEST_XCODE"
-          sudo xcode-select -s "$LATEST_XCODE"
-          xcodebuild -version
+      - name: 🟢 Setup Node.js (v22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-      # ── 3. Install XcodeGen ──────────────────────────────────────
-      - name: 🍺 Install XcodeGen
-        run: |
-          export HOMEBREW_NO_REQUIRE_TAP_TRUST=1
-          brew install xcodegen
+      - name: 📦 Install dependencies
+        run: npm install
 
-      # ── 4. Generate .xcodeproj ───────────────────────────────────
-      - name: ⚙️ Generate Xcode project
-        run: xcodegen generate
+      - name: 🔨 Bundle Web Assets to www/
+        run: npm run build
 
-      # ── 5. Archive (unsigned) ─────────────────────────────────────
-      - name: 🏗️ Archive (Unsigned)
+      - name: 📱 Add & Sync Capacitor iOS Project
         run: |
-          xcodebuild archive \
-            -project CustomerManager.xcodeproj \
-            -scheme CustomerManager \
-            -destination "generic/platform=iOS" \
-            -configuration "${{ github.event.inputs.configuration || 'Release' }}" \
-            -archivePath "${{ github.workspace }}/build/CustomerManager.xcarchive" \
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+
+      - name: 🛠️ Build iOS App with Xcode (Unsigned / Ad-hoc)
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            clean build
 
-      # ── 6. Package IPA ────────────────────────────────────────────
-      - name: 📦 Package IPA
+      - name: 📦 Package into .IPA (Payload structure)
         run: |
           mkdir -p Payload
-
-          # Find the .app inside the archive
-          APP_PATH=$(find "${{ github.workspace }}/build/CustomerManager.xcarchive" -name "*.app" -maxdepth 5 | head -1)
-
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -name "App.app" -type d | head -n 1)
           if [ -z "$APP_PATH" ]; then
-            echo "❌ .app not found. Archive contents:"
-            find "${{ github.workspace }}/build/" -maxdepth 5 || true
+            echo "❌ Không tìm thấy thư mục App.app!"
             exit 1
           fi
-
-          echo "✅ Found app: $APP_PATH"
+          echo "Found app at: $APP_PATH"
           cp -r "$APP_PATH" Payload/
-          zip -r CustomerManager.ipa Payload/
+          zip -r -9 CustomerManager.ipa Payload
+          echo "🎉 Đóng gói thành công CustomerManager.ipa"
 
-          echo "📦 IPA size: $(du -sh CustomerManager.ipa | cut -f1)"
-
-      # ── 7. Upload artifact ────────────────────────────────────────
-      - name: 📤 Upload IPA
+      - name: 🚀 Upload IPA Artifact to GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: CustomerManager-IPA-${{ github.sha }}
+          name: CustomerManager-iOS-IPA
           path: CustomerManager.ipa
           retention-days: 30
-
-      # ── 8. Summary ────────────────────────────────────────────────
-      - name: 🎉 Build Summary
-        run: |
-          echo "## ✅ Build Thành Công!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Thông tin | Giá trị |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **App** | CustomerManager |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Config** | ${{ github.event.inputs.configuration || 'Release' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Commit** | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📲 Cách cài IPA lên điện thoại" >> $GITHUB_STEP_SUMMARY
-          echo "1. Tải file **CustomerManager.ipa** từ **Artifacts** bên dưới" >> $GITHUB_STEP_SUMMARY
-          echo "2. Cài bằng **[AltStore](https://altstore.io)** hoặc **[Sideloadly](https://sideloadly.io)**" >> $GITHUB_STEP_SUMMARY
-          echo "3. Cần Apple ID miễn phí để sideload (7 ngày resign lại)" >> $GITHUB_STEP_SUMMARY
