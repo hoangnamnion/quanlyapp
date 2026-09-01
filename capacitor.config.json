@@ -1,0 +1,6 @@
+{
+  "appId": "com.customermanager.app",
+  "appName": "Quản Lý KH",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
