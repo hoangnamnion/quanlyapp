@@ -1,0 +1,17 @@
+name            = "customer-manager-api"
+main            = "worker.js"
+compatibility_date = "2024-09-01"
+
+# ── KV Namespace ─────────────────────────────────────────────
+# Bước 1: Tạo KV namespace trên Cloudflare dashboard hoặc chạy:
+#   npx wrangler kv:namespace create CUSTOMERS
+# Sau đó copy id vào đây:
+[[kv_namespaces]]
+binding = "KV"
+id      = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# ── Routes (tuỳ chọn) ────────────────────────────────────────
+# Nếu muốn dùng custom domain, bỏ comment dưới:
+# routes = [
+#   { pattern = "api.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
