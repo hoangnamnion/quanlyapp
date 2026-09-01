@@ -8,25 +8,25 @@ enum CustomerStatus: String, Codable, CaseIterable {
 
     var label: String {
         switch self {
-        case .active:       "Còn hạn"
-        case .expiringSoon: "Sắp hết hạn"
-        case .expired:      "Hết hạn"
+        case .active:       return "Còn hạn"
+        case .expiringSoon: return "Sắp hết hạn"
+        case .expired:      return "Hết hạn"
         }
     }
 
     var icon: String {
         switch self {
-        case .active:       "checkmark.circle.fill"
-        case .expiringSoon: "exclamationmark.circle.fill"
-        case .expired:      "xmark.circle.fill"
+        case .active:       return "checkmark.circle.fill"
+        case .expiringSoon: return "exclamationmark.circle.fill"
+        case .expired:      return "xmark.circle.fill"
         }
     }
 
     var color: Color {
         switch self {
-        case .active:       AppTheme.green
-        case .expiringSoon: AppTheme.orange
-        case .expired:      AppTheme.red
+        case .active:       return AppTheme.green
+        case .expiringSoon: return AppTheme.orange
+        case .expired:      return AppTheme.red
         }
     }
 }
