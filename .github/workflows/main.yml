@@ -1,0 +1,96 @@
+name: 🍎 Build iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: false
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+
+jobs:
+  build-ipa:
+    name: Build CustomerManager IPA
+    runs-on: macos-14
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Select Xcode ──────────────────────────────────────────
+      - name: 🔧 Select Xcode 15
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app
+          xcodebuild -version
+
+      # ── 3. Install XcodeGen ──────────────────────────────────────
+      - name: 🍺 Install XcodeGen
+        run: brew install xcodegen
+
+      # ── 4. Generate .xcodeproj ───────────────────────────────────
+      - name: ⚙️ Generate Xcode project
+        run: xcodegen generate
+
+      # ── 5. Archive (unsigned) ─────────────────────────────────────
+      - name: 🏗️ Archive (Unsigned)
+        run: |
+          xcodebuild archive \
+            -project CustomerManager.xcodeproj \
+            -scheme CustomerManager \
+            -configuration "${{ github.event.inputs.configuration || 'Release' }}" \
+            -archivePath "${{ github.workspace }}/build/CustomerManager.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -allowProvisioningUpdates || true
+
+      # ── 6. Package IPA ────────────────────────────────────────────
+      - name: 📦 Package IPA
+        run: |
+          mkdir -p Payload
+
+          # Find the .app inside the archive
+          APP_PATH=$(find "${{ github.workspace }}/build/CustomerManager.xcarchive" -name "*.app" -maxdepth 5 | head -1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ .app not found. Archive contents:"
+            find "${{ github.workspace }}/build/" -maxdepth 5 || true
+            exit 1
+          fi
+
+          echo "✅ Found app: $APP_PATH"
+          cp -r "$APP_PATH" Payload/
+          zip -r CustomerManager.ipa Payload/
+
+          echo "📦 IPA size: $(du -sh CustomerManager.ipa | cut -f1)"
+
+      # ── 7. Upload artifact ────────────────────────────────────────
+      - name: 📤 Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: CustomerManager-IPA-${{ github.sha }}
+          path: CustomerManager.ipa
+          retention-days: 30
+
+      # ── 8. Summary ────────────────────────────────────────────────
+      - name: 🎉 Build Summary
+        run: |
+          echo "## ✅ Build Thành Công!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Thông tin | Giá trị |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **App** | CustomerManager |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Config** | ${{ github.event.inputs.configuration || 'Release' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📲 Cách cài IPA lên điện thoại" >> $GITHUB_STEP_SUMMARY
+          echo "1. Tải file **CustomerManager.ipa** từ **Artifacts** bên dưới" >> $GITHUB_STEP_SUMMARY
+          echo "2. Cài bằng **[AltStore](https://altstore.io)** hoặc **[Sideloadly](https://sideloadly.io)**" >> $GITHUB_STEP_SUMMARY
+          echo "3. Cần Apple ID miễn phí để sideload (7 ngày resign lại)" >> $GITHUB_STEP_SUMMARY
